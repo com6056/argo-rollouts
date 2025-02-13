@@ -596,6 +596,7 @@ func (f *fixture) newController(resync resyncFunc) (*Controller, informers.Share
 		MetricsServer:                   metricsServer,
 		Recorder:                        record.NewFakeEventRecorder(),
 		RefResolver:                     &FakeWorkloadRefResolver{},
+		EphemeralMetadataThreads:        DefaultEphemeralMetadataThreads,
 	})
 
 	var enqueuedObjectsLock sync.Mutex

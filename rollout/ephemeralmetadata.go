@@ -3,12 +3,16 @@ package rollout
 import (
 	"context"
 
+	"golang.org/x/sync/errgroup"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	replicasetutil "github.com/argoproj/argo-rollouts/utils/replicaset"
 )
+
+// DefaultEphemeralMetadataThreads is the default number of worker threads to run when reconciling ephemeral metadata
+const DefaultEphemeralMetadataThreads = 10
 
 // reconcileEphemeralMetadata syncs canary/stable ephemeral metadata to ReplicaSets and pods
 func (c *rolloutContext) reconcileEphemeralMetadata() error {
@@ -68,16 +72,28 @@ func (c *rolloutContext) syncEphemeralMetadata(ctx context.Context, rs *appsv1.R
 		return err
 	}
 	existingPodMetadata := replicasetutil.ParseExistingPodMetadata(rs)
+
+	var eg errgroup.Group
+	eg.SetLimit(c.ephemeralMetadataThreads)
+
 	for _, pod := range pods {
-		newPodObjectMeta, podModified := replicasetutil.SyncEphemeralPodMetadata(&pod.ObjectMeta, existingPodMetadata, podMetadata)
-		if podModified {
-			pod.ObjectMeta = *newPodObjectMeta
-			_, err = c.kubeclientset.CoreV1().Pods(pod.Namespace).Update(ctx, pod, metav1.UpdateOptions{})
-			if err != nil {
-				return err
+		pod := pod
+		eg.Go(func() error {
+			newPodObjectMeta, podModified := replicasetutil.SyncEphemeralPodMetadata(&pod.ObjectMeta, existingPodMetadata, podMetadata)
+			if podModified {
+				pod.ObjectMeta = *newPodObjectMeta
+				_, err = c.kubeclientset.CoreV1().Pods(pod.Namespace).Update(ctx, pod, metav1.UpdateOptions{})
+				if err != nil {
+					return err
+				}
+				c.log.Infof("synced ephemeral metadata %v to Pod %s", podMetadata, pod.Name)
 			}
-			c.log.Infof("synced ephemeral metadata %v to Pod %s", podMetadata, pod.Name)
-		}
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return err
 	}
 
 	// 2. Update ReplicaSet so that any new pods it creates will have the metadata

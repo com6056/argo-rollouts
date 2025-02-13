@@ -200,6 +200,7 @@ func NewManager(
 	kubeInformerFactory kubeinformers.SharedInformerFactory,
 	controllerNamespaceInformerFactory kubeinformers.SharedInformerFactory,
 	jobInformerFactory kubeinformers.SharedInformerFactory,
+	ephemeralMetadataThreads int,
 ) *Manager {
 
 	runtime.Must(rolloutscheme.AddToScheme(scheme.Scheme))
@@ -265,6 +266,7 @@ func NewManager(
 		IngressWorkQueue:                ingressWorkqueue,
 		MetricsServer:                   metricsServer,
 		Recorder:                        recorder,
+		EphemeralMetadataThreads:        ephemeralMetadataThreads,
 	})
 
 	experimentController := experiments.NewController(experiments.ControllerConfig{

@@ -26,6 +26,7 @@ import (
 	jobprovider "github.com/argoproj/argo-rollouts/metricproviders/job"
 	clientset "github.com/argoproj/argo-rollouts/pkg/client/clientset/versioned"
 	"github.com/argoproj/argo-rollouts/pkg/signals"
+	"github.com/argoproj/argo-rollouts/rollout"
 	controllerutil "github.com/argoproj/argo-rollouts/utils/controller"
 	"github.com/argoproj/argo-rollouts/utils/defaults"
 	ingressutil "github.com/argoproj/argo-rollouts/utils/ingress"
@@ -44,31 +45,32 @@ const (
 
 func newCommand() *cobra.Command {
 	var (
-		clientConfig         clientcmd.ClientConfig
-		rolloutResyncPeriod  int64
-		logLevel             string
-		logFormat            string
-		klogLevel            int
-		metricsPort          int
-		healthzPort          int
-		instanceID           string
-		qps                  float32
-		burst                int
-		rolloutThreads       int
-		experimentThreads    int
-		analysisThreads      int
-		serviceThreads       int
-		ingressThreads       int
-		istioVersion         string
-		trafficSplitVersion  string
-		ambassadorVersion    string
-		ingressVersion       string
-		appmeshCRDVersion    string
-		albIngressClasses    []string
-		nginxIngressClasses  []string
-		awsVerifyTargetGroup bool
-		namespaced           bool
-		printVersion         bool
+		clientConfig             clientcmd.ClientConfig
+		rolloutResyncPeriod      int64
+		logLevel                 string
+		logFormat                string
+		klogLevel                int
+		metricsPort              int
+		healthzPort              int
+		instanceID               string
+		qps                      float32
+		burst                    int
+		rolloutThreads           int
+		experimentThreads        int
+		analysisThreads          int
+		serviceThreads           int
+		ingressThreads           int
+		ephemeralMetadataThreads int
+		istioVersion             string
+		trafficSplitVersion      string
+		ambassadorVersion        string
+		ingressVersion           string
+		appmeshCRDVersion        string
+		albIngressClasses        []string
+		nginxIngressClasses      []string
+		awsVerifyTargetGroup     bool
+		namespaced               bool
+		printVersion             bool
 	)
 	electOpts := controller.NewLeaderElectionOptions()
 	var command = cobra.Command{
@@ -197,7 +199,8 @@ func newCommand() *cobra.Command {
 				namespaced,
 				kubeInformerFactory,
 				controllerNamespaceInformerFactory,
-				jobInformerFactory)
+				jobInformerFactory,
+				ephemeralMetadataThreads)
 
 			if err = cm.Run(ctx, rolloutThreads, serviceThreads, ingressThreads, experimentThreads, analysisThreads, electOpts); err != nil {
 				log.Fatalf("Error running controller: %s", err.Error())
@@ -225,6 +228,7 @@ func newCommand() *cobra.Command {
 	command.Flags().IntVar(&analysisThreads, "analysis-threads", controller.DefaultAnalysisThreads, "Set the number of worker threads for the Experiment controller")
 	command.Flags().IntVar(&serviceThreads, "service-threads", controller.DefaultServiceThreads, "Set the number of worker threads for the Service controller")
 	command.Flags().IntVar(&ingressThreads, "ingress-threads", controller.DefaultIngressThreads, "Set the number of worker threads for the Ingress controller")
+	command.Flags().IntVar(&ephemeralMetadataThreads, "ephemeral-metadata-threads", rollout.DefaultEphemeralMetadataThreads, "Set the number of worker threads for the Ephemeral Metadata reconciler")
 	command.Flags().StringVar(&istioVersion, "istio-api-version", defaults.DefaultIstioVersion, "Set the default Istio apiVersion that controller should look when manipulating VirtualServices.")
 	command.Flags().StringVar(&ambassadorVersion, "ambassador-api-version", defaults.DefaultAmbassadorVersion, "Set the Ambassador apiVersion that controller should look when manipulating Ambassador Mappings.")
 	command.Flags().StringVar(&trafficSplitVersion, "traffic-split-api-version", defaults.DefaultSMITrafficSplitVersion, "Set the default TrafficSplit apiVersion that controller uses when creating TrafficSplits.")
